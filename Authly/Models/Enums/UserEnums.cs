@@ -6,6 +6,7 @@
         Frontend,
         BA,
         Dev,
-        TeamLead
+        TeamLead, 
+        Admin
     }
 }

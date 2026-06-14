@@ -21,7 +21,7 @@ namespace Authly.Models
 
         [BsonElement("role")]
         [BsonRepresentation(BsonType.String)]
-        public UserRole? Role { get; set; } = UserRole.Dev;
+        public UserRole Role { get; set; } = UserRole.Dev;
 
         [BsonElement("username")]
         public string Username { get; set; } = string.Empty;
