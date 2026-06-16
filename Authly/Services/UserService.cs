@@ -75,7 +75,7 @@ namespace Authly.Services
             }
 
             // Handle password
-            var hashPassword = "iaojfpoasjofsadijfoaisdj";
+            var hashPassword = BCrypt.Net.BCrypt.HashPassword(data.Password);
 
             var userDoc = new User
             {
