@@ -1,5 +1,8 @@
-﻿namespace Authly.Models.Enums
+﻿using System.Text.Json.Serialization;
+
+namespace Authly.Models.Enums
 {
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum UserRole
     {
         Backend,

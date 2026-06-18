@@ -52,7 +52,6 @@ namespace Authly.Models.Dtos
     public record UpdateUserDto(
         string? Name,
         string? Birthday,
-        string? AvtUrl,
         UserRole? Role
     );
 }

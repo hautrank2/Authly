@@ -24,9 +24,12 @@ builder.Services.AddOpenApi();
 // Add services to the container.
 builder.Services.Configure<AuthlyDatabaseSettings>(
     builder.Configuration.GetSection("AuthlyDatabase"));
+builder.Services.Configure<CloudinarySettings>(
+    builder.Configuration.GetSection("Cloudinary"));
 
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 

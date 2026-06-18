@@ -1,6 +1,7 @@
 using Authly.Models;
 using Authly.Models.Dtos;
 using Authly.Services.Dtos;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
@@ -9,12 +10,14 @@ namespace Authly.Services
     public class UserService : IUserService
     {
         private readonly IMongoCollection<User> _users;
+        private readonly ICloudinaryService _cloudinaryService;
 
-        public UserService(IOptions<AuthlyDatabaseSettings> settings)
+        public UserService(IOptions<AuthlyDatabaseSettings> settings, ICloudinaryService cloudinaryService)
         {
             var client = new MongoClient(settings.Value.ConnectionString);
             var database = client.GetDatabase(settings.Value.DatabaseName);
             _users = database.GetCollection<User>(settings.Value.UsersCollectionName);
+            _cloudinaryService = cloudinaryService;
         }
 
 
@@ -71,7 +74,8 @@ namespace Authly.Services
             var avtUrl = "";
             if (data.Avatar != null)
             {
-                // upload
+                var uploadResult = await _cloudinaryService.UploadImageAsync(data.Avatar, "user");
+                avtUrl = uploadResult.PublicId;
             }
 
             // Handle password
@@ -92,27 +96,96 @@ namespace Authly.Services
 
             return UserDto.FromUser(userDoc);
         }
-        Task<bool> IUserService.AssignRoleAsync(string id, string role)
+
+        public async Task<UserDto?> GetByIdAsync(string id)
+        {
+            var user = await _users.Find(x => x.Id == id).FirstOrDefaultAsync();
+            return user != null ? UserDto.FromUser(user) : null;
+        }
+
+        public Task<UserDto?> GetByEmailAsync(string email)
         {
             throw new NotImplementedException();
         }
 
-        Task<bool> IUserService.DeleteAsync(string id)
+        public async Task<UserDto> UpdateAsync(string id, UpdateUserDto dto)
+        {
+            var filter = Builders<User>.Filter.Eq(u => u.Id, id);
+            var updateDefinition = new List<UpdateDefinition<User>>();
+
+            if (dto.Name != null)
+                updateDefinition.Add(Builders<User>.Update.Set(u => u.Name, dto.Name));
+
+            if (dto.Birthday != null)
+                updateDefinition.Add(Builders<User>.Update.Set(u => u.Birthday, dto.Birthday));
+
+            if (dto.Role.HasValue)
+                updateDefinition.Add(Builders<User>.Update.Set(u => u.Role, dto.Role.Value));
+
+            if (updateDefinition.Count == 0)
+            {
+                var user = await _users.Find(filter).FirstOrDefaultAsync();
+                if (user == null)
+                    throw new KeyNotFoundException($"User with ID {id} not found.");
+                return UserDto.FromUser(user);
+            }
+
+            updateDefinition.Add(Builders<User>.Update.Set(u => u.UpdatedAt, DateTime.UtcNow));
+
+            var update = Builders<User>.Update.Combine(updateDefinition);
+            var updatedUser = await _users.FindOneAndUpdateAsync(
+                filter,
+                update,
+                new FindOneAndUpdateOptions<User> { ReturnDocument = ReturnDocument.After }
+            );
+
+            if (updatedUser == null)
+                throw new KeyNotFoundException($"User with ID {id} not found.");
+
+            return UserDto.FromUser(updatedUser);
+        }
+
+        public async Task<UserDto> UpdateImageAsync(string id, IFormFile file)
+        {
+            var filter = Builders<User>.Filter.Eq(u => u.Id, id);
+            var user = await _users.Find(filter).FirstOrDefaultAsync();
+            if (user == null)
+                throw new KeyNotFoundException($"User with ID {id} not found.");
+
+            if (!string.IsNullOrEmpty(user.AvtUrl))
+            {
+                try
+                {
+                    await _cloudinaryService.DeleteImageAsync(user.AvtUrl);
+                }
+                catch
+                {
+                    // Ignore or log error to not block the user from uploading a new image
+                }
+            }
+
+            var uploadResult = await _cloudinaryService.UploadImageAsync(file, "user");
+            var publicId = uploadResult.PublicId;
+
+            var update = Builders<User>.Update
+                .Set(u => u.AvtUrl, publicId)
+                .Set(u => u.UpdatedAt, DateTime.UtcNow);
+
+            var updatedUser = await _users.FindOneAndUpdateAsync(
+                filter,
+                update,
+                new FindOneAndUpdateOptions<User> { ReturnDocument = ReturnDocument.After }
+            );
+
+            return UserDto.FromUser(updatedUser);
+        }
+
+        public Task<bool> DeleteAsync(string id)
         {
             throw new NotImplementedException();
         }
 
-        Task<UserDto?> IUserService.GetByEmailAsync(string email)
-        {
-            throw new NotImplementedException();
-        }
-
-        Task<UserDto?> IUserService.GetByIdAsync(string id)
-        {
-            throw new NotImplementedException();
-        }
-
-        Task<UserDto> IUserService.UpdateAsync(string id, UpdateUserDto dto)
+        public Task<bool> AssignRoleAsync(string id, string role)
         {
             throw new NotImplementedException();
         }

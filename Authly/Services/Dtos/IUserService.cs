@@ -1,4 +1,5 @@
 using Authly.Models.Dtos;
+using Microsoft.AspNetCore.Http;
 
 namespace Authly.Services.Dtos
 {
@@ -10,6 +11,7 @@ namespace Authly.Services.Dtos
         Task<UserDto?> GetByIdAsync(string id);
         Task<UserDto?> GetByEmailAsync(string email);
         Task<UserDto> UpdateAsync(string id, UpdateUserDto dto);
+        Task<UserDto> UpdateImageAsync(string id, IFormFile file);
         Task<bool> DeleteAsync(string id);
         Task<bool> AssignRoleAsync(string id, string role);
     }
