@@ -5,5 +5,6 @@ namespace Authly.Services.Dtos
     public interface IAuthService
     {
         Task<LoginResponseDto> LoginAsync(LoginRequestDto request);
+        Task LogoutAsync(string jti, DateTime expiresAt);
     }
 }

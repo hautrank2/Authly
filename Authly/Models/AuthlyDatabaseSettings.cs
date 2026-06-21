@@ -1,4 +1,4 @@
-﻿namespace Authly.Models
+namespace Authly.Models
 {
     public class AuthlyDatabaseSettings
     {
@@ -7,5 +7,7 @@
         public string DatabaseName { get; set; } = null!;
 
         public string UsersCollectionName { get; set; } = null!;
+
+        public string RevokedTokensCollectionName { get; set; } = "revoked_tokens";
     }
 }

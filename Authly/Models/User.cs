@@ -40,5 +40,16 @@ namespace Authly.Models
         [BsonElement("updatedAt")]
         [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        [BsonElement("createdBy")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string? CreatedBy { get; set; }
+
+        [BsonElement("updatedBy")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string? UpdatedBy { get; set; }
+
+        [BsonElement("isDeleted")]
+        public bool IsDeleted { get; set; } = false;
     }
 }

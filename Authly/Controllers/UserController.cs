@@ -1,8 +1,9 @@
 using Authly.Models.Dtos;
 using Authly.Services.Dtos;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace Authly.Controllers
 {
@@ -12,6 +13,7 @@ namespace Authly.Controllers
     public class UserController(IUserService userService) : ControllerBase
     {
         [HttpGet]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAll([FromQuery] UserQueryDto request)
         {
             var result = await userService.GetAllAsync(request);
@@ -22,24 +24,64 @@ namespace Authly.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromForm] CreateUserDto dto)
         {
-            var result = await userService.CreateAsync(dto);
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var result = await userService.CreateAsync(dto, actorId);
             return Ok(result);
         }
 
         [HttpPut("{id}")]
-        [Authorize]
-        public async Task<IActionResult> Update([FromRoute] string id, [FromForm] UpdateUserDto dto)
+        public async Task<IActionResult> Update([FromRoute] string id, [FromBody] UpdateUserDto dto)
         {
-            var result = await userService.UpdateAsync(id, dto);
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var isAdmin = User.IsInRole("Admin");
+
+            if (!isAdmin && actorId != id)
+                return Forbid();
+
+            var result = await userService.UpdateAsync(id, dto, actorId);
             return Ok(result);
         }
 
         [HttpPut("{id}/image")]
-        [Authorize]
         public async Task<IActionResult> UpdateImage([FromRoute] string id, IFormFile file)
         {
-            var result = await userService.UpdateImageAsync(id, file);
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var isAdmin = User.IsInRole("Admin");
+
+            if (!isAdmin && actorId != id)
+                return Forbid();
+
+            var result = await userService.UpdateImageAsync(id, file, actorId);
             return Ok(result);
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete([FromRoute] string id)
+        {
+            await userService.DeleteAsync(id);
+            return Ok(new { message = "User deleted successfully." });
+        }
+
+        [HttpPut("{id}/change-password")]
+        public async Task<IActionResult> ChangePassword([FromRoute] string id, [FromBody] ChangePasswordDto dto)
+        {
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+            // Chỉ chính user mới được đổi password của mình
+            if (actorId != id)
+                return Forbid();
+
+            await userService.ChangePasswordAsync(id, dto);
+            return Ok(new { message = "Password changed successfully." });
+        }
+
+        [HttpPut("{id}/reset-password")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ResetPassword([FromRoute] string id, [FromBody] ResetPasswordDto dto)
+        {
+            await userService.ResetPasswordAsync(id, dto);
+            return Ok(new { message = "Password reset successfully." });
         }
     }
 }
