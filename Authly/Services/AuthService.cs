@@ -4,6 +4,7 @@ using Authly.Services.Dtos;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
+using StackExchange.Redis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -12,15 +13,14 @@ namespace Authly.Services
 {
     public class AuthService(
         IOptions<AuthlyDatabaseSettings> dbSettings,
-        IOptions<JwtSettings> jwtSettings) : IAuthService
+        IOptions<JwtSettings> jwtSettings,
+        IConnectionMultiplexer redis) : IAuthService
     {
         private readonly IMongoCollection<User> _users = new MongoClient(dbSettings.Value.ConnectionString)
             .GetDatabase(dbSettings.Value.DatabaseName)
             .GetCollection<User>(dbSettings.Value.UsersCollectionName);
 
-        private readonly IMongoCollection<RevokedToken> _revokedTokens = new MongoClient(dbSettings.Value.ConnectionString)
-            .GetDatabase(dbSettings.Value.DatabaseName)
-            .GetCollection<RevokedToken>(dbSettings.Value.RevokedTokensCollectionName);
+        private readonly IDatabase _redisDb = redis.GetDatabase();
 
         private readonly JwtSettings _jwt = jwtSettings.Value;
 
@@ -61,12 +61,11 @@ namespace Authly.Services
 
         public async Task LogoutAsync(string jti, DateTime expiresAt)
         {
-            var revokedToken = new RevokedToken
+            var expiryTimeSpan = expiresAt - DateTime.UtcNow;
+            if (expiryTimeSpan > TimeSpan.Zero)
             {
-                Jti = jti,
-                ExpiresAt = expiresAt,
-            };
-            await _revokedTokens.InsertOneAsync(revokedToken);
+                await _redisDb.StringSetAsync($"revoked_token:{jti}", "revoked", expiryTimeSpan);
+            }
         }
 
         private (string token, string jti) GenerateToken(User user, DateTime expiresAt)

@@ -6,6 +6,7 @@ using Authly.Services.Dtos;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
+using StackExchange.Redis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
@@ -31,6 +32,12 @@ builder.Services.Configure<CloudinarySettings>(
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var redisConnString = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+    return ConnectionMultiplexer.Connect(redisConnString);
+});
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 
@@ -72,15 +79,9 @@ builder.Services.AddAuthentication(options =>
                     return;
                 }
 
-                var mongoClient = context.HttpContext.RequestServices.GetRequiredService<IMongoClient>();
-                var dbSettings = builder.Configuration.GetSection("AuthlyDatabase").Get<AuthlyDatabaseSettings>()!;
-                var revokedTokens = mongoClient
-                    .GetDatabase(dbSettings.DatabaseName)
-                    .GetCollection<RevokedToken>(dbSettings.RevokedTokensCollectionName);
-
-                var isRevoked = await revokedTokens
-                    .Find(t => t.Jti == jti)
-                    .AnyAsync();
+                var redis = context.HttpContext.RequestServices.GetRequiredService<IConnectionMultiplexer>();
+                var db = redis.GetDatabase();
+                var isRevoked = await db.KeyExistsAsync($"revoked_token:{jti}");
 
                 if (isRevoked)
                 {
@@ -113,22 +114,6 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(connectionString));
 
 var app = builder.Build();
-
-// Tạo TTL index để MongoDB tự xóa revoked token hết hạn
-using (var scope = app.Services.CreateScope())
-{
-    var mongoClient = scope.ServiceProvider.GetRequiredService<IMongoClient>();
-    var dbSettings = builder.Configuration.GetSection("AuthlyDatabase").Get<AuthlyDatabaseSettings>()!;
-    var revokedTokens = mongoClient
-        .GetDatabase(dbSettings.DatabaseName)
-        .GetCollection<RevokedToken>(dbSettings.RevokedTokensCollectionName);
-
-    var indexModel = new CreateIndexModel<RevokedToken>(
-        Builders<RevokedToken>.IndexKeys.Ascending(t => t.ExpiresAt),
-        new CreateIndexOptions { ExpireAfter = TimeSpan.Zero }
-    );
-    await revokedTokens.Indexes.CreateOneAsync(indexModel);
-}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
