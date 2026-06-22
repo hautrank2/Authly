@@ -1,3 +1,4 @@
 .vs/
 bin/
 obj/
+Authly/appsettings.Development.json

@@ -12,11 +12,12 @@ using System.Text;
 namespace Authly.Services
 {
     public class AuthService(
+        IMongoClient mongoClient,
         IOptions<AuthlyDatabaseSettings> dbSettings,
         IOptions<JwtSettings> jwtSettings,
         IConnectionMultiplexer redis) : IAuthService
     {
-        private readonly IMongoCollection<User> _users = new MongoClient(dbSettings.Value.ConnectionString)
+        private readonly IMongoCollection<User> _users = mongoClient
             .GetDatabase(dbSettings.Value.DatabaseName)
             .GetCollection<User>(dbSettings.Value.UsersCollectionName);
 
