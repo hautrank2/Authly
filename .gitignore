@@ -2,3 +2,4 @@
 bin/
 obj/
 Authly/appsettings.Development.json
+Authly/appsettings.Production.json

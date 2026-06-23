@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  authly-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: authly-api
+    ports:
+      - "5180:5180" # Map port 5180 của container ra port 5180 của máy Windows
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Cho phép container phân giải domain host.docker.internal về máy Windows
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5180
+      - ConnectionStrings__Redis=host.docker.internal:6379 # Kết nối tới Redis chạy trên máy Windows
+      - AuthlyDatabase__ConnectionString=mongodb://host.docker.internal:27017 # Kết nối tới MongoDB chạy trên máy Windows (thêm user/pass nếu có)
+      - AuthlyDatabase__DatabaseName=AuthlyDb
+      - AuthlyDatabase__UsersCollectionName=users
+      # Cấu hình JWT
+      - Jwt__Key=YOUR_SECRET_JWT_KEY
+      - Jwt__Issuer=http://localhost:5180
+      - Jwt__Audience=http://localhost:5180
