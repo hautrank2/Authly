@@ -57,10 +57,11 @@ namespace Authly.Controllers
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Delete([FromRoute] string id)
+        public async Task<IActionResult> Delete([FromRoute] string id, [FromQuery] bool hardDelete = false)
         {
-            await userService.DeleteAsync(id);
-            return Ok(new { message = "User deleted successfully." });
+            await userService.DeleteAsync(id, hardDelete);
+            var message = hardDelete ? "User permanently deleted." : "User deleted successfully.";
+            return Ok(new { message });
         }
 
         [HttpPut("{id}/change-password")]

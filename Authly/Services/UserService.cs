@@ -226,15 +226,19 @@ namespace Authly.Services
             return UserDto.FromUser(updatedUser);
         }
 
-        public async Task<bool> DeleteAsync(string id)
+        public async Task<bool> DeleteAsync(string id, bool hardDelete = false)
         {
-            var notDeleted = Builders<User>.Filter.Or(
-                Builders<User>.Filter.Eq(u => u.IsDeleted, false),
-                Builders<User>.Filter.Exists(u => u.IsDeleted, false)
-            );
-            var user = await _users.Find(
-                Builders<User>.Filter.Eq(u => u.Id, id) & notDeleted
-            ).FirstOrDefaultAsync();
+            var filter = hardDelete
+                ? Builders<User>.Filter.Eq(u => u.Id, id)
+                : Builders<User>.Filter.And(
+                    Builders<User>.Filter.Eq(u => u.Id, id),
+                    Builders<User>.Filter.Or(
+                        Builders<User>.Filter.Eq(u => u.IsDeleted, false),
+                        Builders<User>.Filter.Exists(u => u.IsDeleted, false)
+                    )
+                );
+
+            var user = await _users.Find(filter).FirstOrDefaultAsync();
 
             if (user == null)
                 throw new KeyNotFoundException($"User with ID {id} not found.");
@@ -243,8 +247,30 @@ namespace Authly.Services
             if (user.Role == UserRole.Admin)
                 throw new InvalidOperationException("Cannot delete an admin user.");
 
-            var update = Builders<User>.Update.Set(u => u.IsDeleted, true);
-            await _users.UpdateOneAsync(u => u.Id == id, update);
+            if (hardDelete)
+            {
+                // Xóa avatar từ Cloudinary
+                if (!string.IsNullOrEmpty(user.AvtUrl))
+                {
+                    try
+                    {
+                        await _cloudinaryService.DeleteImageAsync(user.AvtUrl);
+                    }
+                    catch
+                    {
+                        // Ignore: không block nếu xóa ảnh thất bại
+                    }
+                }
+
+                // Xóa hoàn toàn document
+                await _users.DeleteOneAsync(u => u.Id == id);
+            }
+            else
+            {
+                // Soft delete: chỉ set IsDeleted = true
+                var update = Builders<User>.Update.Set(u => u.IsDeleted, true);
+                await _users.UpdateOneAsync(u => u.Id == id, update);
+            }
 
             return true;
         }
