@@ -13,4 +13,4 @@ jobs:
       - name: Deploy to server via SSH
         run: |
           cd /home/hautrank2/code/Authly
-          bash deploy.sh
+          bash ./deploy.sh
