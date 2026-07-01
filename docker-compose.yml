@@ -12,7 +12,6 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5180
-      # Redis connection string được đọc từ appsettings.Production.json trên server
       - AuthlyDatabase__ConnectionString=mongodb://host.docker.internal:27017
       - AuthlyDatabase__DatabaseName=AuthlyDb
       - AuthlyDatabase__UsersCollectionName=users
@@ -23,8 +22,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      # Mount appsettings.Production.json từ server, không cần build lại image khi đổi config
-      - ./appsettings.Production.json:/app/appsettings.Production.json:ro
+      - ./Authly/appsettings.Production.json:/app/appsettings.Production.json
     networks:
       - authly-network
     extra_hosts:
